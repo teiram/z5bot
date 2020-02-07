@@ -1,0 +1,14 @@
+[Unit]
+Description=Zork Bot
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 -u bot.py > zorkb.log 2>&1
+WorkingDirectory=/home/pi/app/zorkb
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
