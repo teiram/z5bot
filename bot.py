@@ -7,6 +7,7 @@ import sys
 import time
 
 import telegram.ext
+from telegram.ext.filters import Filters
 
 from dfrotz import DFrotz
 import models
@@ -52,15 +53,18 @@ def cmd_default(bot, message, z5bot, chat):
         if not chat.has_story():
             return
 
+    if text.startswith('/msg'):
+        text = text.split(maxsplit=1)[1]
+
     if not chat.has_story():
         text = 'Please use the /select command to select a game.'
         return bot.sendMessage(message.chat_id, text)
 
     # here, stuff is sent to the interpreter
-    z5bot.process(message.chat_id, message.text)
+    z5bot.process(message.chat_id, text)
 
     received = z5bot.receive(message.chat_id)
-    reply = bot.sendMessage(message.chat_id, received)
+    reply = bot.sendMessage(message.chat_id, received, parse_mode='HTML')
     log_dialog(message, reply)
 
     if ' return ' in received.lower() or ' enter ' in received.lower():
@@ -70,7 +74,7 @@ def cmd_default(bot, message, z5bot, chat):
 def cmd_start(bot, message, *args):
     text =  'Welcome, %s!\n' % message.from_user.first_name
     text += 'Please use the /select command to select a game.\n'
-    return bot.sendMessage(message.chat_id, text)
+    return bot.sendMessage(message.chat_id, text, parse_mode='HTML')
 
 def cmd_select(bot, message, z5bot, chat):
     selection = 'For "%s", write /select %s.'
@@ -84,12 +88,12 @@ def cmd_select(bot, message, z5bot, chat):
         if ' ' in message.text and message.text.strip().lower().split(' ')[1] == story.abbrev:
             chat.set_story(models.Story.get_instance_by_abbrev(story.abbrev))
             z5bot.add_chat(chat)
-            reply = bot.sendMessage(message.chat_id, 'Starting "%s"...' % story.name)
+            reply = bot.sendMessage(message.chat_id, '<pre>Starting "%s"...</pre>' % story.name, parse_mode='HTML')
             log_dialog(message, reply)
-            notice  = 'Your progress will be saved automatically.'
-            reply = bot.sendMessage(message.chat_id, notice)
+            notice  = '<pre>Your progress will be saved automatically.</pre>'
+            reply = bot.sendMessage(message.chat_id, notice, parse_mode='HTML')
             log_dialog(message, reply)
-            reply = bot.sendMessage(message.chat_id, z5bot.receive(message.chat_id))
+            reply = bot.sendMessage(message.chat_id, z5bot.receive(message.chat_id), parse_mode='HTML')
             log_dialog(message, reply)
             return
 
@@ -97,8 +101,8 @@ def cmd_select(bot, message, z5bot, chat):
 
 def cmd_load(bot, message, z5bot, chat):
     if not chat.has_story():
-        text = 'You have to select a game first.'
-        return bot.sendMessage(message.chat_id, text)
+        text = '<pre>You have to select a game first.</pre>'
+        return bot.sendMessage(message.chat_id, text, parse_mode='HTML')
 
     # Todo: match a RegEx against user input. z5bot should not leak my
     # secret files about MKULTRA.
@@ -107,24 +111,24 @@ def cmd_load(bot, message, z5bot, chat):
         z5bot.process(message.chat_id, command)
 
     if "ok" in z5bot.receive(message.chat_id).lower():
-        return bot.sendMessage(message.chat_id, "Restored the game.")
+        return bot.sendMessage(message.chat_id, "<pre>Restored the game.</pre>", parse_mode='HTML')
     else:
-        return bot.sendMessage(message.chat_id, "Something went wrong. Please notify @mrtnb.")
+        return bot.sendMessage(message.chat_id, "<pre>Something went wrong.</pre>", parse_mode='HTML')
 
 
 def cmd_save(bot, message, z5bot, chat):
     if not chat.has_story():
-        text = 'You have to play a game first.'
-        return bot.sendMessage(message.chat_id, text)
+        text = '<pre>You have to play a game first.</pre>'
+        return bot.sendMessage(message.chat_id, text, parse_mode='HTML')
 
     savefile = datetime.datetime.now().strftime("%y%m%d-%H%M") + ".qzl"
     for command in ["save", chat.savedir.joinpath(savefile)]:
         z5bot.process(message.chat_id, command)
 
     if "ok" in z5bot.receive(message.chat_id).lower():
-        return bot.sendMessage(message.chat_id, "Saved. Restore via /load %s." % savefile)
+        return bot.sendMessage(message.chat_id, "<pre>Saved. Restore via /load %s.</pre>" % savefile, parse_mode='HTML')
     else:
-        return bot.sendMessage(message.chat_id, "Something went wrong. Please notify @mrtnb.")
+        return bot.sendMessage(message.chat_id, "<pre>Something went wrong.</pre>", parse_mode='HTML')
 
 def cmd_clear(bot, message, z5bot, chat):
     return bot.sendMessage(message.chat_id, "This is a stub.")
@@ -143,14 +147,15 @@ def cmd_ignore(*args):
 def cmd_ping(bot, message, *args):
     return bot.sendMessage(message.chat_id, 'Pong!')
 
+def cmd_msg(bot, message, z5bot, chat):
+    return cmd_default(bot, message, z5bot, chat) 
 
-def on_message(bot, update):
+def on_message(update, callback_context):
     message = update.message
     z5bot = models.Z5Bot.get_instance_or_create()
     func = z5bot.parser.get_function(message.text)
     chat = models.Chat.get_instance_or_create(message.chat_id)
-
-    out_message = func(bot, message, z5bot, chat)
+    out_message = func(callback_context.bot, message, z5bot, chat)
 
     log_dialog(message, out_message)
 
@@ -183,13 +188,14 @@ if __name__ == '__main__':
     p.add_command('/enter', cmd_enter)
     p.add_command('/i', cmd_ignore)
     p.add_command('/ping', cmd_ping)
+    p.add_command('/msg',cmd_msg)
     z5bot.add_parser(p)
 
 
-    updater = telegram.ext.Updater(api_key)
+    updater = telegram.ext.Updater(api_key, use_context=True)
     dispatcher = updater.dispatcher
     # Make sure the user's messages get redirected to our parser,
     # with or without a slash in front of them.
-    dispatcher.add_handler(telegram.ext.MessageHandler(filters=[], callback=on_message))
+    dispatcher.add_handler(telegram.ext.MessageHandler(Filters.all, callback=on_message))
     dispatcher.add_error_handler(callback=on_error)
     updater.start_polling()

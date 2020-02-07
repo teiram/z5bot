@@ -51,7 +51,7 @@ class DFrotz():
         self.output = self.raw_output.replace('> > ', '')
         self.output = self.output.replace('\n.\n', '\n\n')
 
-        return self.output
+        return '<pre>{}</pre>'.format(self.output)
 
     def get(self):
         self.lines = []
