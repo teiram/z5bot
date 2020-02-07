@@ -1,4 +1,4 @@
 certifi==2017.11.5
 future==0.16.0
-python-telegram-bot==8.1.1
+python-telegram-bot==12.3.0
 redis==2.10.5
