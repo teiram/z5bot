@@ -182,7 +182,7 @@ class Z5Bot:
         to the Frotz interpreter.
         """
         self.chat = self.get_chat_by_id(id)
-        self.chat.frotz.send('%s\r\n' % command)
+        self.chat.frotz.send('%s%s' % (command, os.linesep))
 
     def receive(self, id):
         """
