@@ -17,7 +17,7 @@ class DFrotz():
         #print(os.path.abspath(self.frotz_path))
         try:
             self.frotz = subprocess.Popen(
-                [self.frotz_path, self.game_path],
+                [self.frotz_path, '-m', self.game_path],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,    
